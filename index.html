@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jungle Path: Respect & Awareness</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Retro Pixel Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Press Start 2P', monospace;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Retro Arcade Styling */
+        body {
+            background-color: #0b1d0e;
+            color: #d2f8d3;
+            image-rendering: pixelated;
+        }
+
+        /* Pixel Borders & Shadows */
+        .pixel-border {
+            box-shadow: 
+                0 -4px 0 0 #1b431e,
+                0 4px 0 0 #1b431e,
+                -4px 0 0 0 #1b431e,
+                4px 0 0 0 #1b431e,
+                0 0 0 4px #0b1d0e,
+                0 0 0 8px #ffd700;
+        }
+
+        .pixel-card {
+            border: 4px solid #facc15;
+            box-shadow: 4px 4px 0 #14532d;
+        }
+
+        .pixel-btn {
+            position: relative;
+            box-shadow: inset -4px -4px 0px 0px #15803d, 4px 4px 0px 0px #000;
+            transition: transform 0.05s ease, box-shadow 0.05s ease;
+        }
+
+        .pixel-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: inset -2px -2px 0px 0px #15803d, 2px 2px 0px 0px #000;
+        }
+
+        /* Custom Scrollbar for Info Modals */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #052e16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #facc15;
+            border-radius: 0px;
+        }
+
+        /* CRT Screen Scanline Effect (subtle) */
+        .crt::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        /* Shake animation for landing on snakes */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-2px, 0px) rotate(-1deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            60% { transform: translate(-2px, 1px) rotate(0deg); }
+            80% { transform: translate(2px, 1px) rotate(-1deg); }
+            100% { transform: translate(1px, -2px) rotate(0deg); }
+        }
+        .shake-effect {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Glow effects */
+        .neon-glow-yellow {
+            text-shadow: 0 0 8px #facc15, 0 0 16px #eab308;
+        }
+        .neon-glow-green {
+            text-shadow: 0 0 8px #22c55e;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 crt relative overflow-x-hidden">
+
+    <!-- Header / Title Banner -->
+    <header class="text-center mb-3 w-full max-w-lg">
+        <h1 class="text-xl sm:text-2xl text-yellow-400 neon-glow-yellow font-bold tracking-wider mb-1">
+            JUNGLE PATH
+        </h1>
+        <p class="text-xs text-green-400 tracking-wide uppercase">
+            A Journey of Safety & Boundaries
+        </p>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="w-full max-w-lg bg-green-950 p-3 sm:p-4 rounded-lg pixel-border relative z-10 flex flex-col items-center">
+        
+        <!-- Top Status Bar (Scores & Turn Indicators) -->
+        <div class="w-full flex justify-between items-center mb-3 bg-green-900/80 p-2 border-2 border-green-600 rounded text-xs">
+            <!-- Player Stats -->
+            <div id="player-stat" class="flex items-center space-x-2 text-yellow-300">
+                <div class="w-4 h-4 bg-yellow-400 border border-black flex items-center justify-center text-[8px] text-black font-bold">P</div>
+                <div>
+                    <div>YOU</div>
+                    <div class="text-[10px] text-green-200">Tile: <span id="player-tile">1</span></div>
+                </div>
+            </div>
+
+            <!-- Current Turn Indicator -->
+            <div id="turn-indicator" class="text-center px-2 py-1 bg-black/50 border border-yellow-500 text-yellow-400 text-[10px]">
+                YOUR TURN
+            </div>
+
+            <!-- AI Bot Stats -->
+            <div id="bot-stat" class="flex items-center space-x-2 text-cyan-300 text-right">
+                <div>
+                    <div>BOT</div>
+                    <div class="text-[10px] text-cyan-200">Tile: <span id="bot-tile">1</span></div>
+                </div>
+                <div class="w-4 h-4 bg-cyan-400 border border-black flex items-center justify-center text-[8px] text-black font-bold">B</div>
+            </div>
+        </div>
+
+        <!-- Canvas Game Board -->
+        <div class="relative w-full aspect-square bg-green-900 border-4 border-yellow-500 rounded overflow-hidden shadow-inner">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+        </div>
+
+        <!-- Controls & Action Panel -->
+        <div class="w-full mt-3 flex flex-col items-center space-y-2">
+            <!-- Dice Section -->
+            <div class="flex items-center justify-center space-x-4 w-full">
+                <!-- Dice Visual Box -->
+                <div id="dice-box" class="w-12 h-12 bg-yellow-400 border-4 border-black flex items-center justify-center text-xl font-bold text-black shadow-md">
+                    ?
+                </div>
+
+                <!-- Roll Dice Button -->
+                <button id="roll-btn" class="pixel-btn bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 px-6 rounded text-xs sm:text-sm tracking-wider uppercase border-2 border-black flex-1 max-w-[200px]">
+                    ROLL DICE
+                </button>
+
+                <!-- Audio Toggle Button -->
+                <button id="audio-btn" class="w-12 h-12 bg-green-800 hover:bg-green-700 border-2 border-yellow-500 text-yellow-300 flex items-center justify-center text-xs">
+                    🔊
+                </button>
+            </div>
+
+            <!-- Event Status Message Line -->
+            <div id="status-msg" class="text-[10px] sm:text-xs text-center text-yellow-200 h-6 flex items-center justify-center px-2">
+                Click 'ROLL DICE' to move along the path.
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer Links -->
+    <footer class="mt-3 text-[9px] text-green-500 text-center">
+        Created for Educational Awareness • Support & Safety First
+    </footer>
+
+    <!-- ================= MODALS ================= -->
+
+    <!-- 1. Mandatory Awareness Introduction Disclaimer Modal -->
+    <div id="disclaimer-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-3">
+        <div class="bg-green-950 border-4 border-yellow-400 p-4 sm:p-6 max-w-md w-full rounded text-center relative max-h-[90vh] flex flex-col">
+            <div class="text-yellow-400 text-sm sm:text-base font-bold mb-3 neon-glow-yellow border-b-2 border-yellow-500/40 pb-2">
+                ⚠️ AWARENESS PURPOSE
+            </div>
+            
+            <div class="overflow-y-auto text-left text-[10px] sm:text-xs leading-relaxed space-y-3 pr-1 my-2 text-green-100 flex-1">
+                <p class="text-yellow-200 font-bold">
+                    Welcome to Jungle Path: Respect & Boundaries.
+                </p>
+                <p>
+                    <strong class="text-yellow-400">Important Note:</strong> This interactive experience is designed primary as an <span class="underline">educational awareness tool</span> rather than a standard casual game.
+                </p>
+                <p>
+                    Its objective is to foster understanding regarding <strong>personal safety, body autonomy, consent, digital safety, and recognizing sexual offenses/harassment</strong>.
+                </p>
+                <div class="p-2 bg-green-900/90 border border-yellow-500/50 rounded text-[9px] text-yellow-300">
+                    💡 As you navigate the board, landing on special tiles will present educational cards and actionable safety guidance.
+                </div>
+            </div>
+
+            <button id="start-game-btn" class="mt-3 w-full pixel-btn bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 text-xs border-2 border-black tracking-wider uppercase">
+                I UNDERSTAND & PLAY
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. Educational Awareness Info Modal (Triggered by special tiles) -->
+    <div id="awareness-modal" class="fixed inset-0 bg-black/85 z-40 flex items-center justify-center p-3 hidden">
+        <div class="bg-green-950 border-4 border-yellow-400 p-4 max-w-md w-full rounded text-center relative max-h-[85vh] flex flex-col shadow-2xl">
+            <!-- Header Tag -->
+            <div id="modal-category" class="inline-block self-center bg-yellow-500 text-black px-2 py-1 text-[9px] font-bold mb-2 uppercase tracking-wide">
+                KNOWLEDGE TILE
+            </div>
+            
+            <h2 id="modal-title" class="text-yellow-300 text-xs sm:text-sm font-bold mb-2 leading-snug">
+                Topic Title
+            </h2>
+
+            <div id="modal-body" class="overflow-y-auto text-left text-[10px] sm:text-xs leading-relaxed space-y-2 my-2 text-green-100 p-3 bg-black/40 border border-green-700/60 rounded flex-1">
+                Content goes here...
+            </div>
+
+            <div id="modal-tip" class="text-[9px] text-yellow-400 italic mb-3 bg-green-900/60 p-2 border-l-2 border-yellow-400 text-left">
+                Key takeaway phrase.
+            </div>
+
+            <button id="close-modal-btn" class="w-full pixel-btn bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-2.5 text-xs border-2 border-black uppercase">
+                CONTINUE JOURNEY
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. Victory / Game Finish Modal -->
+    <div id="victory-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-green-950 border-4 border-yellow-400 p-5 max-w-md w-full rounded text-center relative">
+            <h2 id="victory-title" class="text-yellow-400 text-base sm:text-lg font-bold mb-3 neon-glow-yellow">
+                JOURNEY COMPLETE!
+            </h2>
+            <p id="victory-desc" class="text-xs text-green-100 mb-4 leading-relaxed">
+                You have completed the path! Knowledge and awareness are key tools to fostering safe and respectful environments for everyone.
+            </p>
+            
+            <div class="bg-green-900/80 p-3 border border-yellow-500/50 rounded text-[10px] text-left text-yellow-200 mb-4 space-y-1">
+                <div class="font-bold text-yellow-400 mb-1">Helplines & Resources:</div>
+                <div>• National Sexual Assault Hotline (USA): 1-800-656-4673</div>
+                <div>• Emergency Services: Contact your local emergency number (e.g. 911 / 112 / 999)</div>
+                <div>• Online Safety: Keep evidence, block offenders, report abuses.</div>
+            </div>
+
+            <button id="restart-game-btn" class="w-full pixel-btn bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 text-xs border-2 border-black uppercase">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        // ==========================================
+        // AUDIO SYNTHESIZER (Web Audio API - 8-Bit)
+        // ==========================================
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playBeep(freq, type, duration) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type || 'square';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e){}
+            }
+
+            playRoll() {
+                this.playBeep(300, 'square', 0.05);
+            }
+
+            playStep() {
+                this.playBeep(440, 'triangle', 0.08);
+            }
+
+            playClimb() {
+                if (this.muted || !this.ctx) return;
+                [300, 400, 500, 600].forEach((f, i) => {
+                    setTimeout(() => this.playBeep(f, 'square', 0.1), i * 70);
+                });
+            }
+
+            playSlide() {
+                if (this.muted || !this.ctx) return;
+                [500, 400, 300, 200].forEach((f, i) => {
+                    setTimeout(() => this.playBeep(f, 'sawtooth', 0.1), i * 70);
+                });
+            }
+
+            playCard() {
+                if (this.muted || !this.ctx) return;
+                this.playBeep(523.25, 'sine', 0.1);
+                setTimeout(() => this.playBeep(659.25, 'sine', 0.15), 100);
+            }
+        }
+
+        const sound = new SoundFX();
+
+        // ==========================================
+        // EDUCATIONAL AWARENESS DATASET
+        // ==========================================
+        const awarenessCards = {
+            3: {
+                category: "Consent & Boundaries",
+                title: "Understanding Enthusiastic Consent",
+                body: "Consent must be given freely, reversibly, informed, enthusiastic, and specific (FRIES). Silence or the absence of a 'no' never equals consent.",
+                tip: "Remember: Consent can be withdrawn at any time."
+            },
+            7: {
+                category: "Personal Safety",
+                title: "Trust Your Instincts",
+                body: "If a situation or person makes you feel uncomfortable, unsafe, or pressured, you have every right to leave or seek help immediately.",
+                tip: "Your safety always comes before politeness."
+            },
+            14: {
+                category: "Recognizing Harassment",
+                title: "Identifying Unwanted Conduct",
+                body: "Sexual harassment includes unwelcome sexual advances, requests for favors, or physical/verbal conduct of a sexual nature that causes discomfort.",
+                tip: "Harassment is never the fault of the target."
+            },
+            22: {
+                category: "Digital Safety",
+                title: "Online Boundaries & Cyber Flashing",
+                body: "Sending unsolicited explicit messages or images is a violation of boundaries and illegal in many jurisdictions. Always respect digital privacy.",
+                tip: "Never feel pressured to share private media."
+            },
+            28: {
+                category: "Bystander Intervention",
+                title: "The 5 Ds of Bystander Intervention",
+                body: "If you witness harassment: Direct (speak up), Distract (interrupt), Delegate (get help), Delay (check in later), or Document (record safely).",
+                tip: "Small actions by bystanders can prevent harm."
+            },
+            36: {
+                category: "Support & Empathy",
+                title: "Believing Disclosures",
+                body: "If someone confides in you about an offense, listen without judgment, avoid asking accusatory questions, and support their decisions.",
+                tip: "Say: 'I believe you and I am here for you.'"
+            },
+            42: {
+                category: "Consent & Boundaries",
+                title: "Power Dynamics & Pressure",
+                body: "Consent cannot be validly given if someone is coerced, intoxicated, or in a vulnerable position where power dynamics are exploited.",
+                tip: "True consent requires equal freedom of choice."
+            },
+            51: {
+                category: "Legal & Human Rights",
+                title: "Bodily Autonomy is a Fundamental Right",
+                body: "Every individual has the right to make decisions about their own body without physical force, intimidation, or social pressure.",
+                tip: "Respecting autonomy builds safe communities."
+            },
+            63: {
+                category: "Digital Safety",
+                title: "Reporting Online Abuse",
+                body: "If you experience harassment online, document evidence (take screenshots), block the perpetrator, and report them to platform administrators.",
+                tip: "You have the right to a safe online space."
+            },
+            75: {
+                category: "Seeking Help",
+                title: "Reaching Out for Support",
+                body: "Confidential resources, hotlines, and counseling services exist to support survivors of harassment and assault 24/7.",
+                tip: "Seeking help is a sign of courage and strength."
+            },
+            84: {
+                category: "Respectful Culture",
+                title: "Challenging Harmful Myths",
+                body: "Debunking victim-blaming statements or inappropriate 'jokes' creates a culture where respect and safety are prioritized.",
+                tip: "Speak up against disrespectful commentary."
+            },
+            92: {
+                category: "Empowerment",
+                title: "Building Safe Spaces Together",
+                body: "Fostering mutual respect, clear communication, and boundary awareness creates safe environments in schools, workplaces, and communities.",
+                tip: "Respect is a daily continuous practice."
+            }
+        };
+
+        // ==========================================
+        // GAME BOARD DEFINITION (LADDERS & SNAKES)
+        // LADDERS = Vines/Ladders of Growth
+        // SNAKES = Obstacles/Pitfalls
+        // ==========================================
+        const ladders = {
+            4: 16,
+            12: 33,
+            20: 41,
+            32: 54,
+            44: 65,
+            62: 81,
+            72: 91
+        };
+
+        const snakes = {
+            27: 9,
+            38: 18,
+            53: 31,
+            67: 46,
+            86: 55,
+            95: 73,
+            98: 79
+        };
+
+        // ==========================================
+        // GAME STATE & CANVAS SETUP
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let playerPos = 1;
+        let botPos = 1;
+        let isPlayerTurn = true;
+        let isMoving = false;
+
+        // Visual Layout calculation
+        const GRID_SIZE = 10;
+        let cellSize = 0;
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.width; // Keep aspect square
+            cellSize = canvas.width / GRID_SIZE;
+            drawBoard();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Convert tile index (1 to 100) to Canvas (x, y) coordinates
+        function getTileCoordinates(tileNum) {
+            const index = tileNum - 1;
+            const row = Math.floor(index / GRID_SIZE); // 0 at bottom row
+            const col = index % GRID_SIZE;
+
+            // Alternate directions for snake pattern
+            let actualCol = col;
+            if (row % 2 === 1) {
+                actualCol = (GRID_SIZE - 1) - col;
+            }
+
+            const canvasRow = (GRID_SIZE - 1) - row; // Canvas Y goes top to bottom
+            const x = actualCol * cellSize + cellSize / 2;
+            const y = canvasRow * cellSize + cellSize / 2;
+
+            return { x, y, row: canvasRow, col: actualCol };
+        }
+
+        // ==========================================
+        // RENDERING / DRAWING FUNCTIONS (Pixel Art Style)
+        // ==========================================
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Grid Tiles
+            for (let i = 1; i <= 100; i++) {
+                const coord = getTileCoordinates(i);
+                const tileX = coord.x - cellSize / 2;
+                const tileY = coord.y - cellSize / 2;
+
+                // Checkerboard colors (Jungle theme greens)
+                const isEven = (Math.floor((i - 1) / 10) + (i % 10)) % 2 === 0;
+                ctx.fillStyle = isEven ? '#14532d' : '#166534';
+                ctx.fillRect(tileX, tileY, cellSize, cellSize);
+
+                // Grid Border
+                ctx.strokeStyle = '#052e16';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(tileX, tileY, cellSize, cellSize);
+
+                // Highlight Awareness Tiles
+                if (awarenessCards[i]) {
+                    ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+                    ctx.fillRect(tileX + 2, tileY + 2, cellSize - 4, cellSize - 4);
+                    
+                    // Star/Icon indicator for awareness tile
+                    ctx.fillStyle = '#facc15';
+                    ctx.font = `${Math.floor(cellSize * 0.3)}px monospace`;
+                    ctx.textAlign = 'right';
+                    ctx.fillText('★', tileX + cellSize - 2, tileY + cellSize - 2);
+                }
+
+                // Tile Numbers
+                ctx.fillStyle = '#86efac';
+                ctx.font = `${Math.max(8, Math.floor(cellSize * 0.22))}px "Press Start 2P"`;
+                ctx.textAlign = 'left';
+                ctx.fillText(i.toString(), tileX + 3, tileY + Math.floor(cellSize * 0.28));
+            }
+
+            // 2. Draw Ladders (Vines - Green/Yellow Pixel Style)
+            for (let start in ladders) {
+                const end = ladders[start];
+                drawLadder(getTileCoordinates(parseInt(start)), getTileCoordinates(end));
+            }
+
+            // 3. Draw Snakes (Obstacles - Red/Magenta Pixel Lines)
+            for (let start in snakes) {
+                const end = snakes[start];
+                drawSnake(getTileCoordinates(parseInt(start)), getTileCoordinates(end));
+            }
+
+            // 4. Draw Player Tokens
+            drawToken(getTileCoordinates(playerPos), '#facc15', 'P', -cellSize * 0.15); // Player (Yellow)
+            drawToken(getTileCoordinates(botPos), '#22d3ee', 'B', cellSize * 0.15);   // Bot (Cyan)
+        }
+
+        // Draw Vine/Ladder
+        function drawLadder(start, end) {
+            ctx.strokeStyle = '#eab308';
+            ctx.lineWidth = Math.max(3, cellSize * 0.08);
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Ladder rungs (pixel dashes)
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = Math.max(2, cellSize * 0.05);
+            const steps = 5;
+            for (let i = 1; i < steps; i++) {
+                const rx = start.x + (end.x - start.x) * (i / steps);
+                const ry = start.y + (end.y - start.y) * (i / steps);
+                ctx.beginPath();
+                ctx.arc(rx, ry, cellSize * 0.08, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        // Draw Snake
+        function drawSnake(start, end) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = Math.max(3, cellSize * 0.1);
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            
+            // Curve mid point for snake shape
+            const midX = (start.x + end.x) / 2 + (start.x > end.x ? 15 : -15);
+            const midY = (start.y + end.y) / 2;
+            
+            ctx.quadraticCurveTo(midX, midY, end.x, end.y);
+            ctx.stroke();
+
+            // Head marker
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.arc(start.x, start.y, cellSize * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw Pixel Token Character
+        function drawToken(coord, color, label, offsetX) {
+            const x = coord.x + offsetX;
+            const y = coord.y;
+            const size = Math.floor(cellSize * 0.45);
+
+            // Token Background Box
+            ctx.fillStyle = color;
+            ctx.fillRect(x - size / 2, y - size / 2, size, size);
+
+            // Black Pixel Outline
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+
+            // Eyes (Pixel Style)
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x - size / 4, y - size / 4, size / 5, size / 5);
+            ctx.fillRect(x + size / 20, y - size / 4, size / 5, size / 5);
+
+            // Label
+            ctx.fillStyle = '#000000';
+            ctx.font = `${Math.floor(size * 0.5)}px "Press Start 2P"`;
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, y + size / 3);
+        }
+
+        // ==========================================
+        // GAME LOGIC & TURNS
+        // ==========================================
+
+        function rollDice() {
+            return Math.floor(Math.random() * 6) + 1;
+        }
+
+        async function handleTurn() {
+            if (isMoving) return;
+            isMoving = true;
+
+            const rollBtn = document.getElementById('roll-btn');
+            const diceBox = document.getElementById('dice-box');
+            const statusMsg = document.getElementById('status-msg');
+
+            rollBtn.disabled = true;
+
+            // 1. Dice Rolling Animation
+            let rolls = 0;
+            const rollInterval = setInterval(() => {
+                const tempVal = Math.floor(Math.random() * 6) + 1;
+                diceBox.innerText = tempVal;
+                sound.playRoll();
+                rolls++;
+                if (rolls > 8) {
+                    clearInterval(rollInterval);
+                }
+            }, 60);
+
+            await new Promise(r => setTimeout(r, 600));
+
+            // 2. Final Dice Value
+            const diceVal = rollDice();
+            diceBox.innerText = diceVal;
+
+            const currentPlayer = isPlayerTurn ? 'You' : 'Computer Bot';
+            statusMsg.innerText = `${currentPlayer} rolled a ${diceVal}!`;
+
+            await new Promise(r => setTimeout(r, 500));
+
+            // 3. Move Step-by-Step
+            if (isPlayerTurn) {
+                playerPos = await movePlayerStepByStep(playerPos, diceVal, 'player');
+                document.getElementById('player-tile').innerText = playerPos;
+                
+                // Check ladder / snake / awareness card
+                playerPos = await checkTileEvents(playerPos, true);
+                document.getElementById('player-tile').innerText = playerPos;
+
+                if (playerPos >= 100) {
+                    showVictoryModal(true);
+                    return;
+                }
+
+                // Switch turn to Bot
+                isPlayerTurn = false;
+                updateTurnUI();
+                setTimeout(handleTurn, 1000); // Trigger Bot Turn
+            } else {
+                botPos = await movePlayerStepByStep(botPos, diceVal, 'bot');
+                document.getElementById('bot-tile').innerText = botPos;
+
+                // Check ladder / snake for Bot
+                botPos = await checkTileEvents(botPos, false);
+                document.getElementById('bot-tile').innerText = botPos;
+
+                if (botPos >= 100) {
+                    showVictoryModal(false);
+                    return;
+                }
+
+                // Switch turn back to Player
+                isPlayerTurn = true;
+                updateTurnUI();
+                rollBtn.disabled = false;
+                isMoving = false;
+            }
+        }
+
+        // Animate Step by Step
+        async function movePlayerStepByStep(startPos, steps, type) {
+            let current = startPos;
+            for (let i = 0; i < steps; i++) {
+                if (current >= 100) break;
+                current++;
+                if (type === 'player') playerPos = current;
+                else botPos = current;
+                
+                sound.playStep();
+                drawBoard();
+                await new Promise(r => setTimeout(r, 220));
+            }
+            return current;
+        }
+
+        // Check Ladders, Snakes, and Awareness Cards
+        async function checkTileEvents(pos, isHuman) {
+            const statusMsg = document.getElementById('status-msg');
+
+            // 1. Check Ladder
+            if (ladders[pos]) {
+                const target = ladders[pos];
+                statusMsg.innerText = isHuman ? "✨ Vine Ladder! Climbing up!" : "🤖 Bot climbed a Vine!";
+                sound.playClimb();
+                await new Promise(r => setTimeout(r, 600));
+                return target;
+            }
+
+            // 2. Check Snake
+            if (snakes[pos]) {
+                const target = snakes[pos];
+                statusMsg.innerText = isHuman ? "🐍 Obstacle hit! Sliding back..." : "🤖 Bot hit an obstacle!";
+                document.querySelector('main').classList.add('shake-effect');
+                sound.playSlide();
+                await new Promise(r => setTimeout(r, 600));
+                document.querySelector('main').classList.remove('shake-effect');
+                return target;
+            }
+
+            // 3. Check Awareness Card (For Player)
+            if (isHuman && awarenessCards[pos]) {
+                sound.playCard();
+                await showAwarenessModal(awarenessCards[pos]);
+            }
+
+            return pos;
+        }
+
+        function updateTurnUI() {
+            const turnIndicator = document.getElementById('turn-indicator');
+            if (isPlayerTurn) {
+                turnIndicator.innerText = "YOUR TURN";
+                turnIndicator.className = "text-center px-2 py-1 bg-black/50 border border-yellow-500 text-yellow-400 text-[10px]";
+            } else {
+                turnIndicator.innerText = "BOT THINKING...";
+                turnIndicator.className = "text-center px-2 py-1 bg-black/50 border border-cyan-500 text-cyan-400 text-[10px]";
+            }
+        }
+
+        // ==========================================
+        // MODAL MANAGEMENT
+        // ==========================================
+
+        function showAwarenessModal(cardData) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('awareness-modal');
+                document.getElementById('modal-category').innerText = cardData.category;
+                document.getElementById('modal-title').innerText = cardData.title;
+                document.getElementById('modal-body').innerText = cardData.body;
+                document.getElementById('modal-tip').innerText = cardData.tip;
+
+                modal.classList.remove('hidden');
+
+                const closeBtn = document.getElementById('close-modal-btn');
+                const handleClose = () => {
+                    modal.classList.add('hidden');
+                    closeBtn.removeEventListener('click', handleClose);
+                    resolve();
+                };
+                closeBtn.addEventListener('click', handleClose);
+            });
+        }
+
+        function showVictoryModal(playerWon) {
+            const modal = document.getElementById('victory-modal');
+            const title = document.getElementById('victory-title');
+            const desc = document.getElementById('victory-desc');
+
+            if (playerWon) {
+                title.innerText = "🎉 YOU REACHED THE END!";
+                desc.innerText = "Congratulations! You completed the path. Remember, awareness, respect, and clear consent make every space safer for everyone.";
+            } else {
+                title.innerText = "🤖 BOT REACHED THE END";
+                desc.innerText = "The computer completed the path first, but knowledge is the true victory. Review the key safety resources below!";
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            playerPos = 1;
+            botPos = 1;
+            isPlayerTurn = true;
+            isMoving = false;
+
+            document.getElementById('player-tile').innerText = '1';
+            document.getElementById('bot-tile').innerText = '1';
+            document.getElementById('dice-box').innerText = '?';
+            document.getElementById('roll-btn').disabled = false;
+            document.getElementById('status-msg').innerText = "Click 'ROLL DICE' to move along the path.";
+
+            document.getElementById('victory-modal').classList.add('hidden');
+            updateTurnUI();
+            drawBoard();
+        }
+
+        // ==========================================
+        // INITIALIZATION & LISTENERS
+        // ==========================================
+        window.onload = function() {
+            sound.init();
+            resizeCanvas();
+
+            // Disclaimer Start Button
+            document.getElementById('start-game-btn').addEventListener('click', () => {
+                sound.init();
+                document.getElementById('disclaimer-modal').classList.add('hidden');
+            });
+
+            // Roll Dice Event
+            document.getElementById('roll-btn').addEventListener('click', () => {
+                sound.init();
+                if (isPlayerTurn && !isMoving) {
+                    handleTurn();
+                }
+            });
+
+            // Restart Button
+            document.getElementById('restart-game-btn').addEventListener('click', resetGame);
+
+            // Audio Toggle
+            const audioBtn = document.getElementById('audio-btn');
+            audioBtn.addEventListener('click', () => {
+                sound.muted = !sound.muted;
+                audioBtn.innerText = sound.muted ? '🔇' : '🔊';
+            });
+        };
+    </script>
+</body>
+</html>
